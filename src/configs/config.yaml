@@ -1,0 +1,38 @@
+data:
+  batch_size: 128
+  num_workers: 10
+  val_ratio: 0.1
+
+optim:
+  algo: AdamW
+  params:
+    weight_decay: 1e-4
+    lr: 1e-3
+
+earlystopping:
+  patience: 5
+  min_delta: 0
+
+ROPscheduler:
+  factor: 0.5
+  patience: 2
+  threshold: 0.001
+
+nepochs: 100
+loss: "CrossEntropyLoss"
+amp: False
+
+logging:
+  wandb: 
+    project: Vision-CIFAR100
+    entity: sample_entity
+  logdir: "/home/sebnm/AIProjects/Vision-CIFAR-100/outputs/checkpoints"  # Better to provide the fullpath, especially on the cluster
+
+plot:
+  losses: "/home/sebnm/AIProjects/Vision-CIFAR-100/outputs/checkpoints"
+
+model:
+  class: SimpleCNN
+  cout: 32        # Filters' number
+  num_layers: 3
+  hidden_size: 128 # Neural Network's hidden layer size

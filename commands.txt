@@ -1,0 +1,9 @@
+EN SE PLACANT DANS ROOT DU PROJET :
+poetry run python -m src.main src/configs/config.yaml train
+OU
+poetry shell -> python -m src.main src/configs/config.yaml train
+poetry shell -> python -m src.main SimpleCNN test
+
+
+watch -n 1 nvidia-smi
+watch -n 1 --color nvidia-smi
