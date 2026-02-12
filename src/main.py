@@ -25,15 +25,6 @@ def train(config):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda") if use_cuda else torch.device("cpu")
 
-    if "wandb" in config["logging"]:
-        wandb_config = config["logging"]["wandb"]
-        wandb.init(project=wandb_config["project"], entity=wandb_config["entity"])
-        wandb_log = wandb.log
-        wandb_log(config)
-        logging.info(f"Will be recording in wandb run name : {wandb.run.name}")
-    else:
-        wandb_log = None
-
     # Build the dataloaders
     logging.info("= Building the dataloaders")
     data_config = config["data"]
@@ -45,11 +36,6 @@ def train(config):
     model_config = config["model"]
     model = models.build_model(model_config, input_size, num_classes)
     model.to(device)
-
-    if config["logging"].get("wandb"):
-        wandb.watch(model, log=None) #log="gradients, log_freq=100" en debug
-        wandb.log({"num_parameters": sum(p.numel() for p in model.parameters())})
-
 
     # Build the loss
     logging.info("= Loss")
@@ -75,6 +61,18 @@ def train(config):
     with open(logdir / "config.yaml", "w") as file:
         yaml.dump(config, file)
 
+    # Wandb
+    if "wandb" in config["logging"]:
+        wandb_config = config["logging"]["wandb"]
+        wandb.init(project=wandb_config["project"], entity=wandb_config["entity"], name=str(logdir).split('/')[-1])
+        wandb_log = wandb.log
+        wandb_log(config)
+        wandb.watch(model, log=None) #log="gradients, log_freq=100" en debug
+        wandb.log({"num_parameters": sum(p.numel() for p in model.parameters())})
+        logging.info(f"Will be recording in wandb run name : {wandb.run.name}")
+    else:
+        wandb_log = None
+
     # Make a summary script of the experiment
     input_size = next(iter(train_loader))[0].shape
     summary_text = (
@@ -89,9 +87,11 @@ def train(config):
         + "## Loss\n\n"
         + f"{loss}\n\n"
         + "## Datasets : \n"
-        + f"Train : {train_loader.dataset.dataset}\n"
-        + f"Validation : {val_loader.dataset.dataset}"
+        + f"Train : {data.log_loader_info(train_loader)}\n"
+        + f"Validation : {data.log_loader_info(val_loader)}\n"
+        + f"Test : {data.log_loader_info(test_loader)}"
     )
+    
     with open(logdir / "summary.txt", "w") as f:
         f.write(summary_text)
     logging.info(summary_text)
@@ -117,6 +117,8 @@ def train(config):
         model_checkpoint,
         logdir
     )
+
+    wandb.finish()
 
 
 
@@ -150,7 +152,6 @@ def test(config, weights_path):
 
     epoch_loss = 0
     num_samples = 0
-    correct = 0
     confidence_sum = 0
     error_confidences = []
 
@@ -164,7 +165,6 @@ def test(config, weights_path):
 
         preds = logits.argmax(1)
         matches = preds == targets
-        correct += matches.sum().item()
 
         # Confiance moyennes des prédicitions (proba)
         probs = torch.softmax(logits, dim=1)
@@ -187,7 +187,6 @@ def test(config, weights_path):
 
 
     epoch_loss /= num_samples
-    accuracy = correct / num_samples
     avg_confidence = confidence_sum / num_samples
     if len(error_confidences) > 0: mean_conf_errors = sum(error_confidences) / len(error_confidences)
     else: mean_conf_errors = 0.0
@@ -197,7 +196,6 @@ def test(config, weights_path):
     logging.info("Top-1 Accuracy\t\t\t: %.3f", top1.compute())
     logging.info("Top-5 Accuracy\t\t\t: %.3f", top5.compute())
     logging.info("Macro Accuracy\t\t\t: %.3f", macro.compute())
-    logging.info("Binary Accuracy\t\t: %.3f", accuracy)
     logging.info("Average Confidence\t\t: %.3f", avg_confidence)
     logging.info("Average Errors' Confidence\t\t: %.3f", mean_conf_errors)
 
