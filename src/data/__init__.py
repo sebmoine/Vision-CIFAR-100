@@ -1,1 +1,1 @@
-from .dataloaders import get_dataloaders
+from .dataloaders import get_dataloaders, log_loader_info
