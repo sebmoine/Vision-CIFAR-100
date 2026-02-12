@@ -1,13 +1,13 @@
 data:
-  batch_size: 128
+  batch_size: 256
   num_workers: 10
   val_ratio: 0.1
 
 optim:
   algo: AdamW
   params:
-    weight_decay: 1e-4
-    lr: 1e-3
+    weight_decay: 0.05
+    lr: 1e-4
 
 earlystopping:
   patience: 5
@@ -18,21 +18,31 @@ ROPscheduler:
   patience: 2
   threshold: 0.001
 
-nepochs: 100
+nepochs: 300
 loss: "CrossEntropyLoss"
 amp: False
 
 logging:
-  wandb: 
+  wandb:
     project: Vision-CIFAR100
-    entity: sample_entity
+    entity: sebmoine-none
   logdir: "/home/sebnm/AIProjects/Vision-CIFAR-100/outputs/checkpoints"  # Better to provide the fullpath, especially on the cluster
 
 plot:
   losses: "/home/sebnm/AIProjects/Vision-CIFAR-100/outputs/checkpoints"
 
 model:
-  class: SimpleCNN
-  cout: 32        # Filters' number
-  num_layers: 3
-  hidden_size: 128 # Neural Network's hidden layer size
+  # class: SimpleCNN
+  # cout: 32        # Filters' number
+  # num_layers: 3
+  # hidden_size: 128 # Neural Network's hidden layer size
+
+  # class: MyCifarResNet
+  # layers: [2,2,2,2] #RN-18
+  # # layers : [3,4,6,3] #RN-34
+  # dataset: cifar100
+  # inplace: 64
+
+  # class : LoadResNet
+  # class : TimmResNet
+  class : LoadViT
