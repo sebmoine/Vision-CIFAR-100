@@ -1,8 +1,10 @@
 import math
 import matplotlib.pyplot as plt
 import torch
+import numpy as np
 from collections import Counter
 from pathlib import Path
+from torchvision.utils import make_grid
 FIGURES_ROOT = Path("outputs/figures")
 
 def show_image(dataset):
@@ -45,7 +47,43 @@ def show_image_per_label(dataset):
         plt.title(classes[label], fontsize=8)
         plt.axis("off")
     plt.tight_layout()
-    plt.savefig()
+    plt.savefig(save_path)
+    plt.close()
+
+
+def show_transformed_samples(dataset, num_samples=16):
+    """
+    Affiche des images après transformations appliquées par le dataset.
+    
+    Args:
+        dataset: instance de torch Dataset avec des transforms
+        num_samples: nombre d'images à afficher
+        seed: pour reproductibilité
+    """
+    save_path = Path(f'{FIGURES_ROOT}/random_transformed_images.png')
+
+    # Tirer quelques indices aléatoires
+    indices = torch.randperm(len(dataset))[:num_samples]
+    
+    # Charger les images transformées
+    images = []
+    labels = []
+    for idx in indices:
+        img, label = dataset[idx]  # le transform est appliqué ici
+        images.append(img)
+        labels.append(label)
+    
+    # Faire une grille d'images
+    grid = make_grid(images, nrow=int(num_samples**0.5), padding=2)
+    
+    # Convertir en format affichable (C, H, W) -> (H, W, C)
+    np_grid = grid.permute(1, 2, 0).numpy()
+    
+    plt.figure(figsize=(8, 8))
+    plt.imshow(np.clip(np_grid, 0, 1))
+    plt.axis('off')
+    plt.tight_layout()
+    plt.savefig(save_path)
     plt.close()
 
 
@@ -76,7 +114,7 @@ def show_transformed_image_per_label(dataset, n=5):
             if j == 0:
                 plt.ylabel(classes[label], fontsize=8)
     plt.tight_layout()
-    plt.savefig()
+    plt.savefig(save_path)
     plt.close()
 
 
@@ -97,5 +135,5 @@ def show_labels_distribution(dataset):
     plt.bar(xs, ys)
     plt.xticks(xs, [classes[x] for x in xs], rotation=90)
     plt.title("Label distribution")
-    plt.savefig()
+    plt.savefig(save_path)
     plt.close()
