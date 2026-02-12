@@ -25,6 +25,7 @@ def out_layers(num_features, hidden_size, num_classes):
     nn.Flatten(start_dim=1),
     nn.Linear(num_features, hidden_size),
     nn.ReLU(),
+    # nn.Dropout(0.3),
     nn.Linear(hidden_size, num_classes)
     ]
 
