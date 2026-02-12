@@ -1,9 +1,10 @@
-*txt
-*lock
-*toml
+commands.txt
+*.lock
+*.toml
 /data/
 logs/
 outputs/
 /tests/
 wandb/
 **/__pycache__/
+**.ipynb
