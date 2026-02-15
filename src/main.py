@@ -1,24 +1,22 @@
 import logging
 import sys
 import os
+import time
 import pathlib
-
+import torch
+import logging
 import yaml
 import wandb
 import torch
 import torchinfo.torchinfo as torchinfo
-from torchmetrics.classification import MulticlassAccuracy
 
-import torch
-import tqdm
-import logging
-import numpy as np
-from torch.cuda.amp import autocast, GradScaler
+from torchmetrics.classification import MulticlassAccuracy
 
 from src import data
 from src import models
 from src import scripts
 from src.utils import losses, optim, run, log_checkpoint
+from src.scripts import time_fcts
 
 
 def train(config):
@@ -106,6 +104,7 @@ def train(config):
     logging.info(f"Nombre de GPUs dispobnibles : {torch.cuda.device_count()}")
     logging.info(f"Utilisation de DataParallel: {'DataParallel' in str(type(model))}")
 
+    run_start = time.time()
     run.fit(
         config,
         model,
@@ -117,7 +116,8 @@ def train(config):
         model_checkpoint,
         logdir
     )
-
+    logging.info("===== TRAINING TIME =====")
+    time_fcts.print_time(time.time() - run_start)
     wandb.finish()
 
 
@@ -138,9 +138,7 @@ def test(config, weights_path):
         os.makedirs(logdir)
     logging.info(f"Will be logging into {logdir}")
 
-
     _, _, test_loader, input_size, num_classes = data.get_dataloaders(data_config, use_cuda)
-
 
     model = models.build_model(model_config, input_size, num_classes).to(device)
     model.load_state_dict(torch.load(weights_path))
@@ -155,6 +153,7 @@ def test(config, weights_path):
     confidence_sum = 0
     error_confidences = []
 
+    inference_start = time.time()
     for inputs, targets in test_loader:
 
         inputs = inputs.to(device, non_blocking=True)
@@ -164,7 +163,6 @@ def test(config, weights_path):
         loss = criterion(logits, targets)
 
         preds = logits.argmax(1)
-        matches = preds == targets
 
         # Confiance moyennes des prédicitions (proba)
         probs = torch.softmax(logits, dim=1)
@@ -178,18 +176,20 @@ def test(config, weights_path):
             error_probs = probs[errors, preds[errors]]
             error_confidences.extend(error_probs.cpu().tolist())
 
-        top1.update(preds, targets)
-        top5.update(logits, targets)  # logits direct pour top-k
+        top1.update(preds, targets)     # possible to give logits
+        top5.update(logits, targets)    # have to give logits for top_k, with k > 1
         macro.update(preds, targets)
 
         epoch_loss += loss.item() * inputs.size(0)
         num_samples += targets.size(0)
 
-
     epoch_loss /= num_samples
     avg_confidence = confidence_sum / num_samples
     if len(error_confidences) > 0: mean_conf_errors = sum(error_confidences) / len(error_confidences)
     else: mean_conf_errors = 0.0
+
+    logging.info("===== TESTING TIME =====")
+    time_fcts.print_time(time.time() - inference_start)
 
     logging.info("====== TEST RESULTS ======")
     logging.info("Batch-Ponderated Loss\t: %.3f", epoch_loss)
@@ -198,6 +198,8 @@ def test(config, weights_path):
     logging.info("Macro Accuracy\t\t\t: %.3f", macro.compute())
     logging.info("Average Confidence\t\t: %.3f", avg_confidence)
     logging.info("Average Errors' Confidence\t\t: %.3f", mean_conf_errors)
+
+
 
 if __name__ == "__main__":
     logging.basicConfig(stream=sys.stdout, level=logging.INFO, format="%(message)s")
@@ -213,20 +215,15 @@ if __name__ == "__main__":
         logging.info(f"Loading {arg}")
         config = yaml.safe_load(open(arg, "r"))
         train(config)
-
     elif command == "test":
         model_name = arg
         logging.info(f"Searching checkpoint for '{model_name}'...")
         model_dir = scripts.get_latest_model_dir(model_name)
-
         logging.info(f"Using checkpoint: {model_dir}")
-
         config_path, weights_path = scripts.get_checkpoint_files(model_dir)
-
         config = yaml.safe_load(open(config_path, "r"))
 
         test(config, weights_path)
-
     else:
         logging.error("Command must be 'train' or 'test'")
         sys.exit(-1)
