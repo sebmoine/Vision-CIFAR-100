@@ -18,11 +18,17 @@ def get_dataloaders(config,use_cuda):
     val_ratio   = config["val_ratio"]
 
     transform_train = transforms.Compose([
-        #Geometry
+        # transforms.RandAugment(num_ops=2,               #Number of augmentation transformations to apply sequentially.
+        #                        magnitude=7,             # Magnitude for all the transformations
+        #                        num_magnitude_bins=30,   #The number of different magnitude values.
+        #                        fill=None),
+
+        # Geometry
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomCrop(32, padding=4), #Train the model to handle partial views.
         #Color & Appearance
         transforms.ColorJitter(brightness=0.25, contrast=0.25, saturation=0.25), # Adjusts brightness, contrast, saturation, hue.
+
         transforms.ToTensor(),  #normalise par 255
         transforms.Normalize(mean=[0.5071, 0.4867, 0.4408],
                             std=[0.2675, 0.2565, 0.2761]), #paramètres pour CIFAR100
@@ -35,7 +41,7 @@ def get_dataloaders(config,use_cuda):
                                  
     ])
     transform_test = transforms.Compose([
-        transforms.ToTensor(),  #normalise par 255
+        transforms.ToTensor(),
         transforms.Normalize(mean=[0.5071, 0.4867, 0.4408],
                             std=[0.2675, 0.2565, 0.2761]) #paramètres pour CIFAR100
 
@@ -51,15 +57,9 @@ def get_dataloaders(config,use_cuda):
     train_dataset = SubsetWithTransform(train_subset, transform=transform_train)
     val_dataset   = SubsetWithTransform(val_subset, transform=transform_test)
 
-    logging.info(f"  - I loaded {len(train_dataset)} TRAIN samples")
-    logging.info(f"  - I loaded {len(val_dataset)}  VAL samples")
-    logging.info(f"  - I loaded {len(test_dataset)} TEST samples")
-
-
     train_loader = DataLoader(train_dataset, shuffle=True, num_workers=num_workers, batch_size=batch_size, pin_memory=use_cuda, drop_last=True, prefetch_factor = 2 if num_workers > 0 else None, persistent_workers=num_workers > 0)
     val_loader   = DataLoader(val_dataset, shuffle=False, num_workers=num_workers, batch_size=batch_size, pin_memory=use_cuda, drop_last=False, prefetch_factor = 2 if num_workers > 0 else None, persistent_workers=num_workers > 0)
     test_loader  = DataLoader(test_dataset, shuffle=False, num_workers=num_workers, batch_size=batch_size, pin_memory=use_cuda, drop_last=False, prefetch_factor = 2 if num_workers > 0 else None, persistent_workers=num_workers > 0)
-
 
     num_classes = len(train_dataset.subset.dataset.classes)
     images, _ = next(iter(train_loader))

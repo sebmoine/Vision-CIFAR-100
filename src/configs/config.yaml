@@ -6,21 +6,31 @@ data:
 optim:
   algo: AdamW
   params:
-    weight_decay: 0.05
-    lr: 1e-4
+    weight_decay: 0.02
+    betas: (0.9, 0.95)
+    lr: 4e-4
 
 earlystopping:
+  state: False
   patience: 5
   min_delta: 0
 
-ROPscheduler:
-  factor: 0.5
-  patience: 2
-  threshold: 0.001
+scheduler:
+  ROPscheduler:
+    state: False
+    factor: 0.5
+    patience: 2
+    threshold: 0.001
+  Cosine:
+    warmup:
+      n_epochs: 5
+      start_factor: 0.01
+      end_factor: 1.0
+
 
 nepochs: 300
 loss: "CrossEntropyLoss"
-amp: False
+amp: True
 
 logging:
   wandb:
@@ -37,12 +47,9 @@ model:
   # num_layers: 3
   # hidden_size: 128 # Neural Network's hidden layer size
 
-  # class: MyCifarResNet
-  # layers: [2,2,2,2] #RN-18
-  # # layers : [3,4,6,3] #RN-34
-  # dataset: cifar100
-  # inplace: 64
+  class: myresnet44 #myresnet14 #smallresnet34
+  dataset: cifar100
+  inplace: 64
 
   # class : LoadResNet
-  # class : TimmResNet
-  class : LoadViT
+  # class : LoadViT

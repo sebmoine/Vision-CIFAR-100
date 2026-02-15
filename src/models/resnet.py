@@ -58,25 +58,21 @@ class BasicBlock(nn.Module):
 
 
 class SmallResNet(nn.Module):
-    def __init__(self, cfg, num_classes):
+    def __init__(self, cfg, num_classes, layers):
         super(SmallResNet, self).__init__()
 
-        layers = cfg["layers"]
         assert len(layers)==4, "'layers' must be an 1D array of length 4."
         dataset = cfg["dataset"]
-
         self.inplace = cfg["inplace"]
 
         self.startingBlock = StartingBlock(dataset, out_channels=self.inplace)
         self.layer1 = self.make_layer(layers[0], self.inplace,   self.inplace)
-        self.layer2 = self.make_layer(layers[0], self.inplace,   self.inplace*2)
-        self.layer3 = self.make_layer(layers[0], self.inplace*2, self.inplace*4)
-        self.layer4 = self.make_layer(layers[0], self.inplace*4, self.inplace*8)
-
+        self.layer2 = self.make_layer(layers[1], self.inplace,   self.inplace*2)
+        self.layer3 = self.make_layer(layers[2], self.inplace*2, self.inplace*4)
+        self.layer4 = self.make_layer(layers[3], self.inplace*4, self.inplace*8)
         self.avgPool = nn.AdaptiveAvgPool2d((1,1)) # [B, DEPTH, X, X] --> [B, DEPTH, 1, 1], avec X=H=W pour une image carrée, on réduit donc les infos profondes en dim 1 avec le AvgPool
         self.flat = nn.Flatten(start_dim=1, end_dim=-1) # Flatten [DEPTH, X, X] --> [B, NUM_FEATURES]
         self.dense = nn.Linear(in_features=self.inplace*8, out_features=num_classes)
-
 
     def make_layer(self, N, in_channels, out_channels):
         layer = []
@@ -87,9 +83,7 @@ class SmallResNet(nn.Module):
                 layer.append(BasicBlock(in_channels, out_channels, downsampling=True))
             else :
                 layer.append(BasicBlock(out_channels, out_channels, downsampling=False))
-
         return nn.Sequential(*layer)
-
 
     def forward(self, x):
         x = self.startingBlock(x)
@@ -103,24 +97,20 @@ class SmallResNet(nn.Module):
         return x
         
 class MyCifarResNet(nn.Module):
-    def __init__(self, cfg, num_classes):
+    def __init__(self, cfg, num_classes, layers):
         super(MyCifarResNet, self).__init__()
 
-        layers = cfg["layers"]
-        assert len(layers)==4, "'layers' must be an 1D array of length 4."
+        assert len(layers)==3, "'layers' must be an 1D array of length 3."
         dataset = cfg["dataset"]
-
         self.inplace = cfg["inplace"]
 
         self.startingBlock = StartingBlock(dataset, out_channels=self.inplace)
         self.layer1 = self.make_layer(layers[0], self.inplace,   self.inplace)
-        self.layer2 = self.make_layer(layers[0], self.inplace,   self.inplace*2)
-        self.layer3 = self.make_layer(layers[0], self.inplace*2, self.inplace*4)
-
+        self.layer2 = self.make_layer(layers[1], self.inplace,   self.inplace*2)
+        self.layer3 = self.make_layer(layers[2], self.inplace*2, self.inplace*4)
         self.avgPool = nn.AdaptiveAvgPool2d((1,1)) # [B, DEPTH, X, X] --> [B, DEPTH, 1, 1], avec X=H=W pour une image carrée, on réduit donc les infos profondes en dim 1 avec le AvgPool
         self.flat = nn.Flatten(start_dim=1, end_dim=-1) # Flatten [DEPTH, X, X] --> [B, NUM_FEATURES]
         self.dense = nn.Linear(in_features=self.inplace*4, out_features=num_classes)
-
 
     def make_layer(self, N, in_channels, out_channels):
         layer = []
@@ -131,9 +121,7 @@ class MyCifarResNet(nn.Module):
                 layer.append(BasicBlock(in_channels, out_channels, downsampling=True))
             else :
                 layer.append(BasicBlock(out_channels, out_channels, downsampling=False))
-
         return nn.Sequential(*layer)
-
 
     def forward(self, x):
         x = self.startingBlock(x)
@@ -144,3 +132,22 @@ class MyCifarResNet(nn.Module):
         x = self.flat(x) # [B, NUM_FEATURES]
         x = self.dense(x)
         return x
+
+
+def myresnet14(cfg, num_classes):
+    return MyCifarResNet(cfg, num_classes, [2, 2, 2])
+
+def myresnet20(cfg, num_classes):
+    return MyCifarResNet(cfg, num_classes, [3, 3, 3])
+
+def myresnet28(cfg, num_classes):
+    return MyCifarResNet(cfg, num_classes, [3, 4, 6])
+
+def myresnet44(cfg, num_classes):
+    return MyCifarResNet(cfg, num_classes, [7, 7, 7])
+
+def smallresnet18(cfg, num_classes):
+    return SmallResNet(cfg, num_classes, [2, 2, 2, 2])
+
+def smallresnet34(cfg, num_classes):
+    return SmallResNet(cfg, num_classes, [3, 4, 6, 3])
