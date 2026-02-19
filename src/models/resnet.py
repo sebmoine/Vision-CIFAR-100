@@ -1,5 +1,8 @@
+import logging
 import torch
 import torch.nn as nn
+
+from src.utils import SE
 
 ResNet_18 = [2,2,2,2]
 ResNet_34 = [3,4,6,3]
@@ -28,7 +31,7 @@ class StartingBlock(nn.Module):
         return x
 
 class BasicBlock(nn.Module):    
-    def __init__(self, in_channels, out_channels, kernel_size=3, downsampling=False):
+    def __init__(self, in_channels, out_channels, kernel_size=3, downsampling=False, SqueezeExcitation=False):
         super(BasicBlock, self).__init__()
         self.idconv = nn.Conv2d(in_channels,out_channels, kernel_size=1, stride=2, padding=0) # on ne veut pas toucher aux valeurs, seulement la réduction spatiale
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=2, padding=1)
@@ -37,6 +40,11 @@ class BasicBlock(nn.Module):
         self.bn1 = nn.BatchNorm2d(out_channels)
         self.bn2 = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
+        if SqueezeExcitation:
+            logging.info("SE-ResNet")
+            self.se = SE.SE_Block(out_channels)
+        else:
+            self.se = nn.Identity()
         self.downsampling=downsampling
 
     def forward(self, x):
@@ -52,6 +60,7 @@ class BasicBlock(nn.Module):
         x = self.relu(x)
         x = self.conv3(x)
         x = self.bn2(x)
+        x = self.se(x)
         x += identity
         x = self.relu(x)
         return x
@@ -64,6 +73,7 @@ class SmallResNet(nn.Module):
         assert len(layers)==4, "'layers' must be an 1D array of length 4."
         dataset = cfg["dataset"]
         self.inplace = cfg["inplace"]
+        self.se = cfg["SqueezeExcitation"]
 
         self.startingBlock = StartingBlock(dataset, out_channels=self.inplace)
         self.layer1 = self.make_layer(layers[0], self.inplace,   self.inplace)
@@ -78,11 +88,11 @@ class SmallResNet(nn.Module):
         layer = []
         for i in range(N):
             if i==0 and out_channels==self.inplace:
-                layer.append(BasicBlock(in_channels, out_channels, downsampling=False))
+                layer.append(BasicBlock(in_channels, out_channels, downsampling=False, SqueezeExcitation=self.se))
             elif i==0 and out_channels!=self.inplace:
-                layer.append(BasicBlock(in_channels, out_channels, downsampling=True))
+                layer.append(BasicBlock(in_channels, out_channels, downsampling=True, SqueezeExcitation=self.se))
             else :
-                layer.append(BasicBlock(out_channels, out_channels, downsampling=False))
+                layer.append(BasicBlock(out_channels, out_channels, downsampling=False, SqueezeExcitation=self.se))
         return nn.Sequential(*layer)
 
     def forward(self, x):
@@ -103,6 +113,7 @@ class MyCifarResNet(nn.Module):
         assert len(layers)==3, "'layers' must be an 1D array of length 3."
         dataset = cfg["dataset"]
         self.inplace = cfg["inplace"]
+        self.se = cfg["SqueezeExcitation"]
 
         self.startingBlock = StartingBlock(dataset, out_channels=self.inplace)
         self.layer1 = self.make_layer(layers[0], self.inplace,   self.inplace)
@@ -116,11 +127,11 @@ class MyCifarResNet(nn.Module):
         layer = []
         for i in range(N):
             if i==0 and out_channels==self.inplace:
-                layer.append(BasicBlock(in_channels, out_channels, downsampling=False))
+                layer.append(BasicBlock(in_channels, out_channels, downsampling=False, SqueezeExcitation=self.se))
             elif i==0 and out_channels!=self.inplace:
-                layer.append(BasicBlock(in_channels, out_channels, downsampling=True))
+                layer.append(BasicBlock(in_channels, out_channels, downsampling=True, SqueezeExcitation=self.se))
             else :
-                layer.append(BasicBlock(out_channels, out_channels, downsampling=False))
+                layer.append(BasicBlock(out_channels, out_channels, downsampling=False, SqueezeExcitation=self.se))
         return nn.Sequential(*layer)
 
     def forward(self, x):
