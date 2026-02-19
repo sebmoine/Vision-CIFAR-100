@@ -1,4 +1,5 @@
 from transformers import ViTConfig, ViTForImageClassification
+import torch.nn as nn
 
 class ViTWrapper(nn.Module):
     def __init__(self, vit_model):
