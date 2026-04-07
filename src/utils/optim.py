@@ -5,6 +5,6 @@ def get_optimizer(cfg, params):
     if cfg["SAM"]:
         return getattr(torch.optim, opti_name) # return the class AdamW not initialized
     else:
-        params_dict = {k: float(v) for k, v in cfg["params"].items() if isinstance(v, str)}  # convert float le "1e-3"
+        params_dict = {k: float(v) for k, v in cfg["params"].items() if v=="lr" or v=="weight_decay"}  # convert float le "1e-3"
         optim_class = getattr(torch.optim, opti_name)
         return optim_class(params, **params_dict)

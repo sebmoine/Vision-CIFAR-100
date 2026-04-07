@@ -1,55 +1,103 @@
+# data:
+#   batch_size: 256
+#   num_workers: 10
+#   val_ratio: 0.1
+
+
+# optim:
+#   algo: AdamW
+#   params:
+#     weight_decay: 1e-3
+#     # betas: (0.9, 0.999) #(0.9, 0.95)
+#     lr: 1e-3
+#   SAM: False
+
+
+# earlystopping:
+#   state: False
+#   patience: 5
+#   min_delta: 0
+
+# scheduler:
+#   ROPscheduler:
+#     state: True
+#     factor: 0.5
+#     patience: 2
+#     threshold: 0.001
+#   Cosine:
+#     warmup:
+#       n_epochs: 5
+#       start_factor: 0.01
+#       end_factor: 1.0
+
+
+# nepochs: 150
+# loss: "CrossEntropyLoss"
+# amp: False
+# mixup: False
+
+# logging:
+#   wandb:
+#     project: Vision-CIFAR100
+#     entity: sebmoine-none
+#   logdir: "/home/sebnm/AIProjects/Vision-CIFAR-100/outputs/checkpoints"  # Better to provide the fullpath, especially on the cluster
+
+# plot:
+#   losses: "/home/sebnm/AIProjects/Vision-CIFAR-100/outputs/checkpoints"
+
+# model:
+#   # class: SimpleCNN
+#   # cout: 32        # Filters' number
+#   # num_layers: 3
+#   # hidden_size: 128 # Neural Network's hidden layer size
+
+#   class: myresnet14 #myresnet14 #smallresnet34
+#   dataset: cifar100
+#   inplace: 64
+#   SqueezeExcitation : False
+
+#   # class : LoadResNet
+#   # class : LoadViT
+
+
+amp: true
+mixup: True
 data:
   batch_size: 256
   num_workers: 10
   val_ratio: 0.1
-
+earlystopping:
+  min_delta: 0
+  patience: 5
+logging:
+  logdir: /home/sebnm/AIProjects/Vision-CIFAR-100/outputs/checkpoints
+  wandb:
+    entity: sebmoine-none
+    project: Vision-CIFAR100
+loss: CrossEntropyLoss
+model:
+  class: myresnet44
+  dataset: cifar100
+  inplace: 64
+  SqueezeExcitation : True
+nepochs: 300
 optim:
   algo: AdamW
   params:
-    weight_decay: 0.02
     betas: (0.9, 0.95)
     lr: 4e-4
-
-earlystopping:
-  state: False
-  patience: 5
-  min_delta: 0
-
+    weight_decay: 0.01
+  SAM: false
+plot:
+  losses: /home/sebnm/AIProjects/Vision-CIFAR-100/outputs/checkpoints
 scheduler:
-  ROPscheduler:
-    state: False
-    factor: 0.5
-    patience: 2
-    threshold: 0.001
   Cosine:
     warmup:
+      end_factor: 1.0
       n_epochs: 5
       start_factor: 0.01
-      end_factor: 1.0
-
-
-nepochs: 300
-loss: "CrossEntropyLoss"
-amp: True
-
-logging:
-  wandb:
-    project: Vision-CIFAR100
-    entity: sebmoine-none
-  logdir: "/home/sebnm/AIProjects/Vision-CIFAR-100/outputs/checkpoints"  # Better to provide the fullpath, especially on the cluster
-
-plot:
-  losses: "/home/sebnm/AIProjects/Vision-CIFAR-100/outputs/checkpoints"
-
-model:
-  # class: SimpleCNN
-  # cout: 32        # Filters' number
-  # num_layers: 3
-  # hidden_size: 128 # Neural Network's hidden layer size
-
-  class: myresnet44 #myresnet14 #smallresnet34
-  dataset: cifar100
-  inplace: 64
-
-  # class : LoadResNet
-  # class : LoadViT
+  ROPscheduler:
+    factor: 0.5
+    patience: 2
+    state: false
+    threshold: 0.001

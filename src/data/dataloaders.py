@@ -1,4 +1,5 @@
-import logging
+import random
+import numpy as np
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -6,10 +7,10 @@ import torchvision.transforms as transforms
 from torch.utils.data import random_split, DataLoader, Dataset
 from src.scripts.plot_data import show_image, show_image_per_label, show_labels_distribution, show_transformed_samples
 
-
+random.seed(42)
+np.random.seed(42)
 torch.manual_seed(42)
 torch.cuda.manual_seed_all(42)
-
 
 def get_dataloaders(config,use_cuda):
 

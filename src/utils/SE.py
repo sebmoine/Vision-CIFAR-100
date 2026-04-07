@@ -11,7 +11,7 @@ import torch.nn as nn
 # source : Medium - Squeeze-and-Excitation Networks (https://medium.com/data-science/squeeze-and-excitation-networks-9ef5e71eacd7)
 
 class SE_Block(nn.Module):
-    def __init__(self, out_channels, ratio=16): # an input convolutional block and the current number of channels it has
+    def __init__(self, out_channels, ratio=4): # an input convolutional block and the current number of channels it has
         super(SE_Block, self).__init__()
         self.avgpool = nn.AdaptiveAvgPool2d(1)                      # B x C x 1 x 1
         self.flatten = nn.Flatten(1,-1)                             # B x C

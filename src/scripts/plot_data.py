@@ -7,15 +7,24 @@ from pathlib import Path
 from torchvision.utils import make_grid
 FIGURES_ROOT = Path("outputs/figures")
 
+def denormalize(tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]):
+    """
+    Inverse la normalisation : (img * std) + mean
+    """
+    mean = torch.tensor(mean).view(3, 1, 1)
+    std = torch.tensor(std).view(3, 1, 1)
+    return tensor * std + mean
+
 def show_image(dataset):
     save_path = Path(f'{FIGURES_ROOT}/random_image.png')
     if save_path.exists():
         return
     idx = torch.randint(len(dataset), (1,)).item()
     img, label = dataset[idx]
+    img_display = denormalize(img).permute(1, 2, 0).clamp(0, 1)
     plt.figure()
-    plt.imshow(img.permute(1,2,0))
-    plt.title(f"Label: {dataset.dataset.classes[label] if hasattr(dataset, 'dataset') else dataset.classes[label]}")
+    plt.imshow(img_display)
+    plt.title(f"Label: {dataset.dataset.classes[label] if hasattr(dataset, 'dataset') else dataset.subset.dataset.classes[label]}")
     plt.axis("off")
     plt.savefig(save_path)
     plt.close()
@@ -24,7 +33,7 @@ def show_image_per_label(dataset):
     save_path = Path(f'{FIGURES_ROOT}/every_labels.png')
     if save_path.exists():
         return
-    base_dataset = dataset.dataset if hasattr(dataset, 'dataset') else dataset
+    base_dataset = dataset.dataset if hasattr(dataset, 'dataset') else dataset.subset.dataset
     classes = base_dataset.classes
     num_classes = len(classes)
     found = {}
@@ -43,7 +52,8 @@ def show_image_per_label(dataset):
     plt.figure(figsize=(cols*2, rows*2))
     for label, img in found.items():
         plt.subplot(rows, cols, label+1)
-        plt.imshow(img.permute(1,2,0))
+        img_display = denormalize(img).permute(1, 2, 0).clamp(0, 1)
+        plt.imshow(img_display)
         plt.title(classes[label], fontsize=8)
         plt.axis("off")
     plt.tight_layout()
@@ -67,11 +77,9 @@ def show_transformed_samples(dataset, num_samples=16):
     
     # Charger les images transformées
     images = []
-    labels = []
     for idx in indices:
-        img, label = dataset[idx]  # le transform est appliqué ici
-        images.append(img)
-        labels.append(label)
+        img, _ = dataset[idx]  # le transform est appliqué ici
+        images.append(denormalize(img).clamp(0, 1))
     
     # Faire une grille d'images
     grid = make_grid(images, nrow=int(num_samples**0.5), padding=2)
@@ -109,7 +117,8 @@ def show_transformed_image_per_label(dataset, n=5):
     for label in range(len(classes)):
         for j in range(n):
             plt.subplot(len(classes), n, label*n + j + 1)
-            plt.imshow(denormalize(found[label][j]).permute(1,2,0))
+            img_display = denormalize(found[label][j]).permute(1, 2, 0).clamp(0, 1)
+            plt.imshow(img_display)
             plt.axis("off")
             if j == 0:
                 plt.ylabel(classes[label], fontsize=8)
@@ -125,7 +134,7 @@ def show_labels_distribution(dataset):
     labels = [dataset[i][1] for i in range(len(dataset))]
     counts = Counter(labels)
 
-    base_dataset = dataset.dataset if hasattr(dataset, 'dataset') else dataset
+    base_dataset = dataset.dataset if hasattr(dataset, 'dataset') else dataset.subset.dataset
     classes = base_dataset.classes
 
     xs = list(counts.keys())

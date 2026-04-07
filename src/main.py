@@ -117,7 +117,7 @@ def train(config):
         logdir
     )
     logging.info("===== TRAINING TIME =====")
-    time_fcts.print_time(time.time() - run_start)
+    time_fcts.print_time(run_start, time.time())
     wandb.finish()
 
 
@@ -189,7 +189,7 @@ def test(config, weights_path):
     else: mean_conf_errors = 0.0
 
     logging.info("===== TESTING TIME =====")
-    time_fcts.print_time(time.time() - inference_start)
+    time_fcts.print_time(inference_start, time.time())
 
     logging.info("====== TEST RESULTS ======")
     logging.info("Batch-Ponderated Loss\t: %.3f", epoch_loss)
