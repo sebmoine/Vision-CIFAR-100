@@ -28,5 +28,5 @@ class Mixup:
         self.y_a, self.y_b = y, y[index]                        # Corresponding targets of the mixed inputs (nb : 2)
         return mixed_x
 
-    def mixup_criterion(self, pred):
+    def mixup_criterion(self, pred, _): # adding arg '_' for compatibility format "criterion(logits, targets)" w/ or without Mixup
         return self.lam * self.criterion(pred, self.y_a) + (1 - self.lam) * self.criterion(pred, self.y_b)

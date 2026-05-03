@@ -8,62 +8,69 @@ from .log_checkpoint import EarlyStopper
 from .transforms import Mixup
 from .SAM import *
 
+def build_train_step(model, criterion, optimizer, scaler, use_mixup=False):
+    """
+        Construit et retourne UNE fonction "step(inputs, targets)" adaptée à la config (évite une cascade de "if" à chauqe batch, ralentissant fortement l'entrainement).
+    """
 
-def train_one_epoch_mixup(model, loader, criterion, optimizer, device, scaler):
-    model.train()
+    # --- Case SAM ---
+    if isinstance(optimizer, SAM):
+        logging.info("SAM STEP BUILDER")
+        def step(inputs, targets):
+            enable_running_stats(model)
+            logits = model(inputs)
+            loss = criterion(logits, targets)
+            loss.backward()                         # obtain grad at "w"
+            optimizer.first_step(zero_grad=True)    # goes to "w + e(w)"
 
-    acc = 0
-    epoch_loss = 0
-    num_samples = 0
+            # second forward-backward pass
+            disable_running_stats(model)                # don't make BN update on the noisy weights
+            loss2 = criterion(model(inputs), targets)   
+            loss2.backward()                            # make sure to do a full forward pass
+            optimizer.second_step(zero_grad=True)       # we keep it True for VRAM memory
+            return loss2, logits  # re-forward pour les métriques
+        return step
 
-    mix_data    = criterion.mixup_data
-    criterion   = criterion.mixup_criterion
-
-    for inputs, targets in tqdm.tqdm(loader, leave=False):
-        inputs  = inputs.to(device,non_blocking=True) #non_blocking : accelère les transferts CPU->GPU
-        targets = targets.to(device,non_blocking=True)
-        inputs = mix_data(inputs, targets)
-
-        optimizer.zero_grad(set_to_none=True)
-
-        if scaler.is_enabled():
-            with torch.amp.autocast('cuda'):
-                logits = model(inputs)
-                loss = criterion(logits)
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-
-        epoch_loss += loss.item() * inputs.size(0)
-        preds = logits.argmax(1)
-        acc += (preds == targets).sum().item()
-        num_samples += targets.size(0)
-
-    epoch_loss = epoch_loss / num_samples
-    epoch_acc = acc / num_samples
-
-    return epoch_loss, epoch_acc
-
-def train_one_epoch(model, loader, criterion, optimizer, device, scaler):
-    model.train()
-
-    acc = 0
-    epoch_loss = 0
-    num_samples = 0
-
-    for inputs, targets in tqdm.tqdm(loader, leave=False):
-        inputs  = inputs.to(device,non_blocking=True) #non_blocking : accelère les transferts CPU->GPU
-        targets = targets.to(device,non_blocking=True)
-
-        optimizer.zero_grad(set_to_none=True)
-
-        if scaler.is_enabled():
+    # --- Case AMP (w/ or without Mixup) ---
+    if scaler.is_enabled():
+        logging.info("AMP STEP BUILDER" + (" WITH MIXUP" if use_mixup else ""))
+        def step(inputs, targets):
             with torch.amp.autocast('cuda'):
                 logits = model(inputs)
                 loss = criterion(logits, targets)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
+            return loss, logits
+        return step
+
+    # --- Case standard (w/ or without Mixup) ---
+    logging.info("STANDARD STEP BUILDER" + (" WITH MIXUP" if use_mixup else ""))
+    def step(inputs, targets):
+        logits = model(inputs)
+        loss = criterion(logits, targets)
+        loss.backward()
+        optimizer.step()
+        return loss, logits
+
+    return step
+
+def train_one_epoch(model, loader, criterion, optimizer, device, scaler):
+    model.train()
+
+    preprocess = criterion.mixup_data if isinstance(criterion, Mixup) else (lambda x, _: x)
+    raw_crit   = criterion.mixup_criterion if isinstance(criterion, Mixup) else criterion
+    step_fn    = build_train_step(model, raw_crit, optimizer, scaler, use_mixup=isinstance(criterion, Mixup))
+
+    acc, epoch_loss, num_samples = 0, 0.0, 0
+
+    for inputs, targets in tqdm.tqdm(loader, leave=False):
+        inputs  = inputs.to(device, non_blocking=True)
+        targets = targets.to(device, non_blocking=True)
+        inputs  = preprocess(inputs, targets)   # no-operation if no Mixup
+
+        optimizer.zero_grad(set_to_none=True)
+        loss, logits = step_fn(inputs, targets)
 
         epoch_loss += loss.item() * inputs.size(0)
         preds = logits.argmax(1)
@@ -74,8 +81,6 @@ def train_one_epoch(model, loader, criterion, optimizer, device, scaler):
     epoch_acc = acc / num_samples
 
     return epoch_loss, epoch_acc
-
-
 
 
 @torch.no_grad()
@@ -124,6 +129,8 @@ def fit(
     train_losses = []
     val_losses   = []
     scaler = torch.amp.GradScaler('cuda', enabled=config["amp"]) #otherwise None
+    assert not (isinstance(base_optimizer, SAM) and scaler.is_enabled()), "Can't be in Mix-Precision with the optimizer SAM."
+
 
     if config_scheduler["ROPscheduler"]["state"]:
         lr_factor    = config_scheduler["ROPscheduler"]["factor"]
@@ -146,16 +153,18 @@ def fit(
                                                              milestones=[config_warmup["n_epochs"]]
                                                              )
     if config["mixup"]:
+        assert not (isinstance(base_optimizer, SAM)), "SAM and Mixup can't both be set as 'True'."
         mixup_criterion = Mixup(criterion, alpha=0.2)
-    else :
-        mixup_criterion = criterion
+        def select_criterion(epoch):
+            return mixup_criterion if 50 <= epoch < 250 else criterion
+    else:
+        def select_criterion(epoch):
+            return criterion
+
 
     for epoch in range(num_epochs):
-
-        if epoch < 50 or epoch >= 250:  #Mixup OFF
-            train_loss, train_acc = train_one_epoch(model, train_loader, criterion, base_optimizer, device, scaler)
-        else:                           #Mixup ON
-            train_loss, train_acc = train_one_epoch_mixup(model, train_loader, mixup_criterion, base_optimizer, device, scaler)
+        active_criterion = select_criterion(epoch)
+        train_loss, train_acc = train_one_epoch(model, train_loader, active_criterion, base_optimizer, device, scaler)
 
         val_loss, val_acc = validate(model, val_loader, criterion, device)
 
